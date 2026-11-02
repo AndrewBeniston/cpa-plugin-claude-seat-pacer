@@ -433,9 +433,13 @@ func TestNormalizeFoldsOrder(t *testing.T) {
 		{"fill-first", OrderPlan},
 	} {
 		cfg := Config{Pace: PaceConfig{Order: tc.in}}
-		cfg.Normalize()
+		warnings := cfg.Normalize()
 		if cfg.Pace.Order != tc.want {
 			t.Errorf("Order %q normalized to %q, want %q", tc.in, cfg.Pace.Order, tc.want)
+		}
+		warned := strings.Contains(strings.Join(warnings, "\n"), "pace.order")
+		if want := tc.in == "fill-first"; warned != want {
+			t.Errorf("Order %q warned=%v, want %v (%q)", tc.in, warned, want, warnings)
 		}
 	}
 }

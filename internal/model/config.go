@@ -257,6 +257,10 @@ func (c *Config) Normalize() (warnings []string) {
 	case OrderPlan, OrderSoonestReset:
 		c.Pace.Order = order
 	default:
+		if order != "" {
+			warnings = append(warnings, fmt.Sprintf(
+				"pace.order %q is not %s or %s, so it runs at %s", c.Pace.Order, OrderPlan, OrderSoonestReset, d.Pace.Order))
+		}
 		c.Pace.Order = d.Pace.Order
 	}
 	switch shape := strings.ToLower(strings.TrimSpace(c.Pace.Shape)); {

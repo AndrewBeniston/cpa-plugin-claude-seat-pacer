@@ -123,3 +123,48 @@ func TestSoonestResetCountsAPastResetAsNow(t *testing.T) {
 		t.Errorf("cost = %v, want 0 for a reset already past", got)
 	}
 }
+
+// An unused seat's weekly window has no period yet. It opens on first use, so
+// the seat waits a whole week and every Cost stays in days.
+func TestSoonestResetPutsAnUnopenedWeekLast(t *testing.T) {
+	now := testNow
+	pool := snapshots(
+		seat("unused", now,
+			paced(model.WindowSession, "", now, 0.5, 0),
+			unopened(model.WindowWeekly, "", 0)),
+		seat("dated", now, weekly(now, 3.0/7, 0.30)),
+	)
+	ranked := Rank(soonestCfg(), pool, []string{"unused", "dated"}, opus, now)
+	if got := rankedIDs(ranked)[0]; got != "dated" {
+		t.Fatalf("picked %q, want dated, which resets first", got)
+	}
+	unused := scoreOf(t, ranked, "unused")
+	if want := model.WeeklyDuration.Hours() / 24; unused.Cost != want || unused.CostUnit != model.CostUnitDays {
+		t.Errorf("unused cost = %v %q, want %v days", unused.Cost, unused.CostUnit, want)
+	}
+}
+
+// With no weekly window weighed there is no reset to order by: every capped
+// seat waits a week and the AuthID settles it, and no Cost is a plan figure.
+func TestSoonestResetWithNoWeightedWeekStaysInDays(t *testing.T) {
+	now := testNow
+	cfg := soonestCfg()
+	cfg.WeeklyWeight = 0
+	pool := snapshots(
+		seat("b", now, weekly(now, 6.0/7, 0.5)),
+		seat("a", now, weekly(now, 1.0/7, 0.5)),
+	)
+	for _, s := range Rank(cfg, pool, []string{"a", "b"}, opus, now) {
+		if s.Cost != 7 || s.CostUnit != model.CostUnitDays {
+			t.Errorf("%s cost = %v %q, want 7 days", s.AuthID, s.Cost, s.CostUnit)
+		}
+	}
+}
+
+func TestPlanOrderLeavesTheCostUnitEmpty(t *testing.T) {
+	now := testNow
+	pool := snapshots(seat("a", now, weekly(now, 0.5, 0.5)))
+	if got := Rank(model.Defaults().Pace, pool, []string{"a"}, opus, now)[0].CostUnit; got != "" {
+		t.Errorf("plan cost unit = %q, want empty", got)
+	}
+}

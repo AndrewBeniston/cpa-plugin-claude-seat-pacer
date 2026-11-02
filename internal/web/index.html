@@ -2149,14 +2149,16 @@ time[data-ts] { cursor: help; }
      term and would come to a confident total the scorer never held. */
   function costText(score) {
     if (!scored(score) || !num(score.cost)) return "—";
-    /* Under the soonest-reset order a capped seat's cost is the days to its
-       first weighted weekly reset, so it prints as that wait. */
-    if (ORDER === ORDER_SOONEST && !sessionOnly(score)) return "resets in " + durText(Math.round(score.cost * 86400));
+    /* A cost in days is the wait to the seat's first weighted weekly reset,
+       so it prints as that wait. */
+    if (daysCost(score)) return "resets in " + durText(Math.max(Math.round(score.cost * 86400), 0));
     return signed(costTenths(score) / 1000);
   }
 
+  function daysCost(score) { return !!(score && score.cost_unit === "days"); }
+
   /* The ranking rule the plugin runs, from the config the status carries;
-     render sets it before anything prints a cost. */
+     render sets it before the formula prints. */
   var ORDER_SOONEST = "soonest-reset";
   var ORDER = "plan";
 
@@ -7661,6 +7663,9 @@ time[data-ts] { cursor: help; }
       if (i < 0 || !num(mine)) return [];
       return [byRank[i - 1], byRank[i + 1]].filter(function (o) {
         if (!o || sessionOnly(famScore(o, fam)) !== sessionOnly(famScore(a, fam)) || !num(costOf(o))) return false;
+        /* A wait prints rounded down, which keeps its order, so only two
+           waits that print the same need the cue, and printKey has those. */
+        if (daysCost(famScore(o, fam)) || daysCost(famScore(a, fam))) return false;
         var span = COST_UNIT * Math.max((mineN + termsOf(o)) / 2 - 1, 0);
         return Math.abs(costOf(o) - mine) <= span + 1e-9;
       });

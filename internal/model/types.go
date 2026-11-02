@@ -338,6 +338,9 @@ const (
 	ReasonNotCandidate = "not-a-candidate"
 )
 
+// CostUnitDays marks a Score.Cost that is days to a weekly reset.
+const CostUnitDays = "days"
+
 // Score is the routing evaluation of one credential for one request.
 type Score struct {
 	AuthID string `json:"auth_id"`
@@ -346,7 +349,14 @@ type Score struct {
 	// target counts against the credential and running under counts for it,
 	// so lower is better; SessionOnly orders credentials before Cost does.
 	// Every term is one window's; nothing else enters it.
+	//
+	// Under OrderSoonestReset a capped credential's Cost is instead the days
+	// until its first weighted weekly reset, and CostUnit says so.
 	Cost float64 `json:"cost"`
+	// CostUnit is CostUnitDays when Cost is days to a reset, and empty when it
+	// is the weighted slack sum. A reader keeps the unit with the score, so a
+	// decision logged under one order still reads right under the other.
+	CostUnit string `json:"cost_unit,omitempty"`
 	// SessionOnly marks a credential with no weekly cap on the requested
 	// model: no weekly window bears on it, so the 5-hour window is its only
 	// quota there. That window resets several times a day rather than running
