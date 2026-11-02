@@ -25,22 +25,31 @@ before its reset. Set `landing-target: 1.0` to plan each seat to finish at its
 reset instead. For an even spread, disable the plugin; the host's own strategy,
 round-robin by default, takes over.
 
-Some seats, Team seats among them, report no all-models weekly window, only a
-5-hour window and a Fable weekly window. On a model outside Fable such a seat
+Some seats, including some Team seats, report no all-models weekly window, only
+a 5-hour window and a Fable weekly window. On a model outside Fable such a seat
 has no weekly cap: its 5-hour window is its only quota, and it resets several
 times a day. Every eligible seat with no weekly cap goes ahead of every seat
 with one, and a seat with a weekly cap takes a new conversation for that model
 only while no seat without one can. Once a seat with no weekly cap has room
 again after its 5-hour reset, new conversations go back to it, and a
-conversation already bound to a seat with a weekly cap stays there. Among
-seats with no weekly cap, the one furthest behind its plan on the 5-hour
-window goes first, whatever the weights; a seat whose 5-hour window has not
-opened yet is neither behind nor ahead of its plan. On Fable these seats have
-a weekly cap like any other and are paced the usual way. No setting controls
-this: it follows each seat's latest readings, so a seat whose usage read or
-responses report an all-models weekly window is paced like any other, and a
-pool in which every seat has a weekly cap on the requested model is ranked on
-its weekly pacing alone.
+conversation already bound to a seat with a weekly cap stays there. Among seats
+with no weekly cap, the one furthest behind its plan on the 5-hour window goes
+first, whatever the weights; a seat whose 5-hour window has not opened yet is
+neither behind nor ahead of its plan. On Fable these seats have a weekly cap
+like any other and are paced the usual way. No setting controls this: it
+follows each seat's latest readings, so a seat whose usage read or responses
+report an all-models weekly window is paced like any other, and a pool in which
+every seat has a weekly cap on the requested model is ranked on its weekly
+pacing alone.
+
+A seat whose usage read reports weekly windows and no 5-hour window, as a plan
+with no 5-hour limit does, has no 5-hour limit to gate it. It is ranked on its
+weekly windows alone, so it stays eligible while seats with a 5-hour limit wait
+out a full one, though a seat with no weekly cap on the model still goes first.
+With a `session-weight` above 0, the seats it is compared with carry a 5-hour
+term it does not. A refusal of the 5-hour window it had before ends at the
+first read that no longer reports the window, and the plugin then ends the
+host's cooldown from that refusal as it does after an early reset.
 
 A seat is ineligible when:
 
@@ -51,16 +60,16 @@ A seat is ineligible when:
 - its usage read has never succeeded, or
 - its reading is older than `max-staleness`.
 
-A seat's reading comes from two sources. The usage endpoint reports the 5-hour
-window, the weekly all-models window and each model family's weekly window;
-the plugin reads it every `poll-interval`, two minutes by default, and again a
-few seconds after each reset. Between reads, the rate-limit headers on every
-completed response update the 5-hour, weekly and Fable weekly windows and
-record any refusal, so the seat taking new conversations closes its gap as it
-works, and once another seat outranks it, new conversations go there. A seat
-refused or full on a window takes no new conversation for the models that
-window caps while another seat has room, until a later reading shows room on
-it.
+A seat's reading comes from two sources. The usage endpoint reports each window
+the seat has: the 5-hour window, the weekly all-models window and each model
+family's weekly window; the plugin reads it every `poll-interval`, two minutes
+by default, and again a few seconds after each reset. Between reads, the
+rate-limit headers on every completed response update the 5-hour, weekly and
+Fable weekly windows and record any refusal, so the seat taking new
+conversations closes its gap as it works, and once another seat outranks it,
+new conversations go there. A seat refused or full on a window takes no new
+conversation for the models that window caps while another seat has room, until
+a later reading shows room on it.
 
 CLIProxyAPI's own session affinity never binds a conversation a plugin routes,
 so the plugin binds each one itself. A new subagent on the same model joins
