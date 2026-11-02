@@ -200,3 +200,21 @@ func TestSoonestResetCountsOnlyWeightedWindows(t *testing.T) {
 		t.Errorf("cost with a session weight = %v, want 5 days", got)
 	}
 }
+
+func TestUntilNextAtAndPastWholePeriods(t *testing.T) {
+	now := testNow
+	for _, tc := range []struct {
+		name  string
+		reset time.Time
+		want  time.Duration
+	}{
+		{"reset now", now, model.WeeklyDuration},
+		{"one hour ahead", now.Add(time.Hour), time.Hour},
+		{"one period and an hour past", now.Add(-model.WeeklyDuration - time.Hour), model.WeeklyDuration - time.Hour},
+	} {
+		w := window(model.WindowWeekly, "", 0.5, tc.reset)
+		if got := untilNext(w, now); got != tc.want {
+			t.Errorf("%s: untilNext = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}

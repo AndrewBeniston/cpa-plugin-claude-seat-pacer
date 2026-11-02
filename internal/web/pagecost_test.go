@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/yuya-iwabuchi/cpa-plugin-claude-seat-pacer/internal/model"
 )
 
 // TestPageCostText runs the page's cost labels under node: a cost in days
@@ -54,5 +56,15 @@ if (fails.length) { console.log(fails.join("\n")); process.exit(1); }
 	}
 	if out, err := exec.Command(node, file).CombinedOutput(); err != nil {
 		t.Errorf("page cost text: %v\n%s", err, out)
+	}
+}
+
+// The page reads the order from the status it is sent, so the reducer must
+// keep it.
+func TestReduceForPageKeepsTheOrder(t *testing.T) {
+	st := model.Status{Config: model.Defaults()}
+	st.Config.Pace.Order = model.OrderSoonestReset
+	if got := reduceForPage(st, []byte("key")).Config.Pace.Order; got != model.OrderSoonestReset {
+		t.Errorf("order = %q, want %q", got, model.OrderSoonestReset)
 	}
 }

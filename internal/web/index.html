@@ -5229,7 +5229,8 @@ time[data-ts] { cursor: help; }
       var hold = markHold(a, ws.scope, locks.live.length > 0), note = heldNote(a, ws.scope, locks.live, now);
       g.setAttribute("aria-label", seatLabel(a) + ", " + windowName(ws) +
         ", day " + dayText(ws.elapsed) + ", " + pct(ws.utilization) + " used" +
-        ", " + overText(ws.slack) + (weighted ? ", counted" + weightTag(ws.weight) + " in the cost" +
+        ", " + overText(ws.slack) + (weighted ? (daysCost(fsc) ? ", sets the reset it waits for"
+          : ", counted" + weightTag(ws.weight) + " in the cost") +
           (famCost ? ", " + ws.scope + " cost " + famCost : "") : ", cost " + costText(a.score)) +
         liveAria(locks.live, now) + (note ? ", " + note : ""));
       var tip = markTip(tipHead, "day " + dayText(ws.elapsed), ws.utilization, ws.target, "target", locks.live, now);
@@ -7975,7 +7976,9 @@ time[data-ts] { cursor: help; }
     tbl.appendChild(h("caption", "", "Candidate costs"));
     var thead = h("thead", "");
     var hr = h("tr", "");
-    ["Seat", "Cost", "Eligibility", "Gap by window (+ over · − under target)"].forEach(function (c, i) {
+    /* A cost in days is the wait to a reset, so the gaps beside it did not rank the seat. */
+    var gapHead = dec.scores.some(daysCost) ? "Gap by window (shown only, not ranked)" : "Gap by window (+ over · − under target)";
+    ["Seat", "Cost", "Eligibility", gapHead].forEach(function (c, i) {
       var th = h("th", i === 1 ? "n" : "", c);
       hr.appendChild(th);
     });
