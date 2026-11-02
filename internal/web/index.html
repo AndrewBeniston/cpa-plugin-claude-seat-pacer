@@ -2148,8 +2148,26 @@ time[data-ts] { cursor: help; }
      window leaves the whole cost unreadable, where the sum below drops that
      term and would come to a confident total the scorer never held. */
   function costText(score) {
-    return scored(score) && num(score.cost) ? signed(costTenths(score) / 1000) : "—";
+    if (!scored(score) || !num(score.cost)) return "—";
+    /* A cost in days is the wait to the seat's first weighted weekly reset,
+       so it prints as that wait. */
+    if (daysCost(score)) return "resets in " + durText(Math.max(Math.round(score.cost * 86400), 0));
+    return signed(costTenths(score) / 1000);
   }
+
+  /* The soonest-reset formula's close. A seat with no weekly cap still goes
+     first, as under the plan order. */
+  function soonestFormulaText(anyLead) {
+    return anyLead ? ": a seat with no weekly cap first, then the eligible seat whose weekly quota resets first"
+      : ": no seat eligible";
+  }
+
+  function daysCost(score) { return !!(score && score.cost_unit === "days"); }
+
+  /* The ranking rule the plugin runs, from the config the status carries;
+     render sets it before the formula prints. */
+  var ORDER_SOONEST = "soonest-reset";
+  var ORDER = "plan";
 
   /* The cost in tenths of a point, as the sum of the terms the page shows.
      Every figure on the page is written to a tenth, and terms each rounded to
@@ -2830,7 +2848,8 @@ time[data-ts] { cursor: help; }
     spec.big = [costText(std)];
     spec.delta = fams.length > 1 ? rankLabel(fams[0]) + " cost" : "cost";
     fams.forEach(function (fam, i) {
-      var sc = famScore(a, fam), parts = scored(sc) ? costParts(sc) : [];
+      /* A cost in days is no sum of window terms, so its card lists none. */
+      var sc = famScore(a, fam), parts = scored(sc) && !daysCost(sc) ? costParts(sc) : [];
       var t = [held[fam]].concat(i ? [costText(sc)] : [], parts).filter(Boolean).join(" · ");
       if (sc !== null && t) spec.lines.push({ b: fams.length > 1 ? rankLabel(fam) : "", t: t });
     });
@@ -5210,7 +5229,8 @@ time[data-ts] { cursor: help; }
       var hold = markHold(a, ws.scope, locks.live.length > 0), note = heldNote(a, ws.scope, locks.live, now);
       g.setAttribute("aria-label", seatLabel(a) + ", " + windowName(ws) +
         ", day " + dayText(ws.elapsed) + ", " + pct(ws.utilization) + " used" +
-        ", " + overText(ws.slack) + (weighted ? ", counted" + weightTag(ws.weight) + " in the cost" +
+        ", " + overText(ws.slack) + (weighted ? (daysCost(fsc) ? ", sets the reset it waits for"
+          : ", counted" + weightTag(ws.weight) + " in the cost") +
           (famCost ? ", " + ws.scope + " cost " + famCost : "") : ", cost " + costText(a.score)) +
         liveAria(locks.live, now) + (note ? ", " + note : ""));
       var tip = markTip(tipHead, "day " + dayText(ws.elapsed), ws.utilization, ws.target, "target", locks.live, now);
@@ -5471,7 +5491,10 @@ time[data-ts] { cursor: help; }
             "a day, so it only gates, and the weekly window is the quota lost at reset."
           : " The " + SESSION_SHORT + " window weighs nothing: it resets several times a day, so its headroom is " +
             "not budget to pace.") +
-      " The eligible seat with the lowest cost takes the next new conversation" +
+      (ORDER === ORDER_SOONEST
+        ? " The plugin runs soonest reset first: a capped seat's cost is the wait to its first weighted weekly " +
+          "reset, and the eligible seat whose quota resets first takes the next new conversation"
+        : " The eligible seat with the lowest cost takes the next new conversation") +
       (fams.length ? " of its family, so each family has its own ranking: " + fams.join(" and ") +
         " for models with their own 7d window, Standard for the rest. The Standard windows apply to every " +
         "request on a seat that has them; " + onTopText(fams) : "") +
@@ -7523,6 +7546,11 @@ time[data-ts] { cursor: help; }
   function renderFormula(st, ranks, view) {
     var host = $("pace-formula");
     host.textContent = "";
+    if (ORDER === ORDER_SOONEST) {
+      host.appendChild(h("b", "", "Soonest reset first"));
+      host.appendChild(document.createTextNode(soonestFormulaText(!!ranks.lead[view])));
+      return;
+    }
     var wts = (st.config && st.config.pace) || {};
     var fams = scopedFamilies(st);
     var std = [];
@@ -7646,6 +7674,9 @@ time[data-ts] { cursor: help; }
       if (i < 0 || !num(mine)) return [];
       return [byRank[i - 1], byRank[i + 1]].filter(function (o) {
         if (!o || sessionOnly(famScore(o, fam)) !== sessionOnly(famScore(a, fam)) || !num(costOf(o))) return false;
+        /* A wait prints rounded down, which keeps its order, so only two
+           waits that print the same need the cue, and printKey has those. */
+        if (daysCost(famScore(o, fam)) || daysCost(famScore(a, fam))) return false;
         var span = COST_UNIT * Math.max((mineN + termsOf(o)) / 2 - 1, 0);
         return Math.abs(costOf(o) - mine) <= span + 1e-9;
       });
@@ -7658,7 +7689,8 @@ time[data-ts] { cursor: help; }
     }, 1);
     ul.style.setProperty("--rank-ch", String(1 + String(shown).length));
     var costOrder = byRank.some(function (x) { return sessionOnly(famScore(x, fam)); })
-      ? "seats with no weekly cap first, then lowest cost first" : "lowest cost first";
+      ? "seats with no weekly cap first, then " + (ORDER === ORDER_SOONEST ? "soonest reset first" : "lowest cost first")
+      : ORDER === ORDER_SOONEST ? "soonest reset first" : "lowest cost first";
     ul.setAttribute("aria-label", rankLabel(fam) + (ranks.tier.multi
       ? " ranking by priority tier; in the serving tier, " + costOrder : " ranking, " + costOrder));
     /* While the serving tier holds an eligible SessionOnly seat for the
@@ -7944,7 +7976,9 @@ time[data-ts] { cursor: help; }
     tbl.appendChild(h("caption", "", "Candidate costs"));
     var thead = h("thead", "");
     var hr = h("tr", "");
-    ["Seat", "Cost", "Eligibility", "Gap by window (+ over · − under target)"].forEach(function (c, i) {
+    /* A cost in days is the wait to a reset, so the gaps beside it did not rank the seat. */
+    var gapHead = dec.scores.some(daysCost) ? "Gap by window (shown only, not ranked)" : "Gap by window (+ over · − under target)";
+    ["Seat", "Cost", "Eligibility", gapHead].forEach(function (c, i) {
       var th = h("th", i === 1 ? "n" : "", c);
       hr.appendChild(th);
     });
@@ -9130,6 +9164,7 @@ time[data-ts] { cursor: help; }
   function render() {
     var st = state.data;
     if (!st) return;
+    ORDER = (st.config && st.config.pace && st.config.pace.order) || "plan";
     indexSeats(st);
     var seats = stableAuths(st.auths);
     var ranks = rankSeats(st);

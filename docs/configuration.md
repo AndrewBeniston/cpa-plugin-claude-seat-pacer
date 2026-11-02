@@ -53,6 +53,7 @@ the bindings, costing each open conversation one prompt-cache miss.
         subagents: true         # a subagent on the same model shares its parent conversation's seat
         max-sessions: 65536     # bindings held before the least recently seen is dropped
       pace:
+        order: plan             # plan, or soonest-reset: the seat whose weekly quota resets first
         shape: linear           # linear, power or sigmoid
         curve-exponent: 1.0     # power shape only, and selects it when shape is unset; above 1 holds back early
         steepness: 8.0          # sigmoid shape only
@@ -70,6 +71,14 @@ the bindings, costing each open conversation one prompt-cache miss.
         enabled: true           # serve the status page
         history-limit: 500      # routing decisions kept for the page; 1 to 10000
 ```
+
+`order: soonest-reset` ranks capped seats by the time to their first weighted
+weekly reset instead of their plan: the seat whose quota resets first takes
+every new conversation until it is full, then the next one does. The gates,
+the 5-hour-only seats first, and conversation affinity work as under `plan`.
+For capped seats the shape and landing then do nothing, and the weights only
+choose which weekly windows count. Seats with no weekly cap keep their plan
+cost. The status page lists each capped seat's wait to its reset as its cost.
 
 Durations take Go syntax (`30s`, `2m`, `1h`). A weight above 100, a
 `request-timeout` above 1m or a `history-limit` above 10000 runs at that

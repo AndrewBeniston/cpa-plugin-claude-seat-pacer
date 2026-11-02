@@ -20,6 +20,11 @@ above the cutoff. A plan per weekly window weighs both. It says how much a
 seat should have used by now, and the seat furthest behind its plan is the
 one most at risk of reaching its reset with quota left.
 
+`pace.order: soonest-reset` swaps the plan for the clock: every new
+conversation goes to the eligible seat whose weekly quota resets first, until
+it is full. It spends the nearest deadline first however light the demand,
+and accepts the cost above. The gates and conversation affinity are the same.
+
 The defaults suit my pool: each seat's plan reaches full quota about 15 hours
 before its reset. Set `landing-target: 1.0` to plan each seat to finish at its
 reset instead. For an even spread, disable the plugin; the host's own strategy,
