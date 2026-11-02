@@ -2155,6 +2155,13 @@ time[data-ts] { cursor: help; }
     return signed(costTenths(score) / 1000);
   }
 
+  /* The soonest-reset formula's close. A seat with no weekly cap still goes
+     first, as under the plan order. */
+  function soonestFormulaText(anyLead) {
+    return anyLead ? ": a seat with no weekly cap first, then the eligible seat whose weekly quota resets first"
+      : ": no seat eligible";
+  }
+
   function daysCost(score) { return !!(score && score.cost_unit === "days"); }
 
   /* The ranking rule the plugin runs, from the config the status carries;
@@ -7536,8 +7543,7 @@ time[data-ts] { cursor: help; }
     host.textContent = "";
     if (ORDER === ORDER_SOONEST) {
       host.appendChild(h("b", "", "Soonest reset first"));
-      host.appendChild(document.createTextNode(ranks.lead[view]
-        ? ": the eligible seat whose weekly quota resets first wins" : ": no seat eligible"));
+      host.appendChild(document.createTextNode(soonestFormulaText(!!ranks.lead[view])));
       return;
     }
     var wts = (st.config && st.config.pace) || {};

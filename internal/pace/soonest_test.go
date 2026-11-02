@@ -168,3 +168,24 @@ func TestPlanOrderLeavesTheCostUnitEmpty(t *testing.T) {
 		t.Errorf("plan cost unit = %q, want empty", got)
 	}
 }
+
+// Only a weighted window sets the wait. With the all-models window at weight
+// 0, a Fable request waits for its Fable cap, not for the sooner all-models
+// reset, and a 5-hour weight changes nothing.
+func TestSoonestResetCountsOnlyWeightedWindows(t *testing.T) {
+	now := testNow
+	cfg := soonestCfg()
+	cfg.WeeklyWeight = 0
+	cfg.ScopedWeight = 0.5
+	snap := seat("a", now,
+		window(model.WindowWeekly, "", 0.2, now.Add(24*time.Hour)),
+		window(model.WindowWeeklyScoped, model.FamilyFable, 0.2, now.Add(5*24*time.Hour)),
+		paced(model.WindowSession, "", now, 0.5, 0.3))
+	if got := ScoreAuth(cfg, snap, fable, now).Cost; math.Abs(got-5) > tolerance {
+		t.Errorf("cost = %v, want 5 days to the weighted Fable cap", got)
+	}
+	cfg.SessionWeight = 1
+	if got := ScoreAuth(cfg, snap, fable, now).Cost; math.Abs(got-5) > tolerance {
+		t.Errorf("cost with a session weight = %v, want 5 days", got)
+	}
+}
