@@ -147,6 +147,12 @@ func ScoreAuth(cfg model.PaceConfig, snap model.AuthSnapshot, modelID string, no
 		score.Windows = append(score.Windows, ws)
 	}
 
+	if cfg.Order == model.OrderSoonestReset && !score.SessionOnly {
+		if days, ok := daysToSoonestReset(score.Windows, now); ok {
+			score.Cost = days
+		}
+	}
+
 	switch {
 	case bearing == 0:
 		score.Eligible = false
@@ -162,6 +168,29 @@ func ScoreAuth(cfg model.PaceConfig, snap model.AuthSnapshot, modelID string, no
 		score.Reason = model.ReasonSpent
 	}
 	return score
+}
+
+// daysToSoonestReset is the time, in days, until the earliest reset of a
+// weekly window that carries weight in the score, which is the Cost under
+// model.OrderSoonestReset. Only a weighted window counts, so the windows that
+// set the rank are the ones the plan order would weigh. A reset already past
+// counts as now. It reports false when no weekly window carries weight, and
+// the plan Cost then stands.
+func daysToSoonestReset(windows []model.WindowScore, now time.Time) (float64, bool) {
+	soonest, found := time.Duration(0), false
+	for _, ws := range windows {
+		if ws.Weight == 0 || (ws.Kind != model.WindowWeekly && ws.Kind != model.WindowWeeklyScoped) {
+			continue
+		}
+		left := ws.ResetsAt.Sub(now)
+		if left < 0 {
+			left = 0
+		}
+		if !found || left < soonest {
+			soonest, found = left, true
+		}
+	}
+	return soonest.Hours() / 24, found
 }
 
 // open reports whether a window has a period to place on the curve.

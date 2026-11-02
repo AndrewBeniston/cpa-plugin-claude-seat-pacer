@@ -50,6 +50,14 @@ type AffinityConfig struct {
 // within each group the one furthest behind its curve wins, which drains a
 // window that is about to reset while holding back one with days left.
 type PaceConfig struct {
+	// Order names the rule that ranks eligible credentials. "plan" (the
+	// default) prefers the credential furthest behind its pace curve.
+	// "soonest-reset" prefers the credential whose weighted weekly window
+	// resets first, and spends it until a gate refuses it: earliest deadline
+	// first, which loses the least perishable quota however light the demand.
+	// The gates, SessionOnly precedence and affinity are the same under both.
+	// An unknown name reads as plan.
+	Order string `yaml:"order" json:"order"`
 	// Shape names the curve the target follows across a window: "linear"
 	// spends evenly, "power" bends it by CurveExponent, "sigmoid" holds back early,
 	// climbs through the middle and eases off near the end. An unknown name
@@ -93,6 +101,12 @@ type PaceConfig struct {
 	// against the same curve and differ only in weight.
 	ScopedWeight float64 `yaml:"scoped-weight" json:"scoped_weight"`
 }
+
+// Ranking rules for PaceConfig.Order.
+const (
+	OrderPlan         = "plan"
+	OrderSoonestReset = "soonest-reset"
+)
 
 // Curve shapes for PaceConfig.Shape.
 const (
@@ -147,6 +161,7 @@ func Defaults() Config {
 			Subagents:   true,
 		},
 		Pace: PaceConfig{
+			Order:         OrderPlan,
 			Shape:         ShapeLinear,
 			CurveExponent: 1.0,
 			Steepness:     8.0,
@@ -237,6 +252,12 @@ func (c *Config) Normalize() (warnings []string) {
 			warnings = append(warnings, aboveBound(w.name, *w.v, maxWeight))
 			*w.v = maxWeight
 		}
+	}
+	switch order := strings.ToLower(strings.TrimSpace(c.Pace.Order)); order {
+	case OrderPlan, OrderSoonestReset:
+		c.Pace.Order = order
+	default:
+		c.Pace.Order = d.Pace.Order
 	}
 	switch shape := strings.ToLower(strings.TrimSpace(c.Pace.Shape)); {
 	case shape == ShapeLinear || shape == ShapePower || shape == ShapeSigmoid:

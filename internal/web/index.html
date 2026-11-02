@@ -2148,8 +2148,17 @@ time[data-ts] { cursor: help; }
      window leaves the whole cost unreadable, where the sum below drops that
      term and would come to a confident total the scorer never held. */
   function costText(score) {
-    return scored(score) && num(score.cost) ? signed(costTenths(score) / 1000) : "—";
+    if (!scored(score) || !num(score.cost)) return "—";
+    /* Under the soonest-reset order a capped seat's cost is the days to its
+       first weighted weekly reset, so it prints as that wait. */
+    if (ORDER === ORDER_SOONEST && !sessionOnly(score)) return "resets in " + durText(Math.round(score.cost * 86400));
+    return signed(costTenths(score) / 1000);
   }
+
+  /* The ranking rule the plugin runs, from the config the status carries;
+     render sets it before anything prints a cost. */
+  var ORDER_SOONEST = "soonest-reset";
+  var ORDER = "plan";
 
   /* The cost in tenths of a point, as the sum of the terms the page shows.
      Every figure on the page is written to a tenth, and terms each rounded to
@@ -7523,6 +7532,12 @@ time[data-ts] { cursor: help; }
   function renderFormula(st, ranks, view) {
     var host = $("pace-formula");
     host.textContent = "";
+    if (ORDER === ORDER_SOONEST) {
+      host.appendChild(h("b", "", "Soonest reset first"));
+      host.appendChild(document.createTextNode(ranks.lead[view]
+        ? ": the eligible seat whose weekly quota resets first wins" : ": no seat eligible"));
+      return;
+    }
     var wts = (st.config && st.config.pace) || {};
     var fams = scopedFamilies(st);
     var std = [];
@@ -9130,6 +9145,7 @@ time[data-ts] { cursor: help; }
   function render() {
     var st = state.data;
     if (!st) return;
+    ORDER = (st.config && st.config.pace && st.config.pace.order) || "plan";
     indexSeats(st);
     var seats = stableAuths(st.auths);
     var ranks = rankSeats(st);

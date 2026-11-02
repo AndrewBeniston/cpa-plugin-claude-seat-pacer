@@ -91,7 +91,7 @@ var _ web.Syncer = (*runtime.Plugin)(nil)
 // Makefile reads pluginVersion from this line to name the installed library.
 const (
 	pluginName    = "claude-seat-pacer"
-	pluginVersion = "0.6.0"
+	pluginVersion = "0.6.1-soonest.1"
 	pluginAuthor  = "yuya-iwabuchi"
 	pluginRepo    = "https://github.com/yuya-iwabuchi/cpa-plugin-claude-seat-pacer"
 )
@@ -103,6 +103,7 @@ const (
 var configFields = []runtime.ConfigField{
 	{Name: "providers", Type: "array", Description: "Provider keys the plugin governs. Default [claude]."},
 	{Name: "affinity.ttl", Type: "string", Description: "Idle time before a conversation's credential binding expires. Default 1h."},
+	{Name: "pace.order", Type: "enum", EnumValues: []string{model.OrderPlan, model.OrderSoonestReset}, Description: "How seats are ranked. Plan gives each new conversation to the seat furthest behind its pace plan. Soonest-reset gives it to the seat whose weekly quota resets first, until that seat is full. Default plan."},
 	{Name: "pace.shape", Type: "enum", EnumValues: []string{model.ShapeLinear, model.ShapePower, model.ShapeSigmoid}, Description: "Target curve shape. Linear spends evenly, power bends the curve by pace.curve-exponent, and sigmoid holds back early and eases off near the end. Default linear."},
 	{Name: "pace.curve-exponent", Type: "number", Description: "Exponent for the power shape; above 1.0 holds back early. Selects the power shape when pace.shape is unset, and is ignored by the sigmoid shape. Default 1.0."},
 	{Name: "pace.steepness", Type: "number", Description: "Slope through the sigmoid's midpoint. Ignored by the other shapes. Default 8.0."},

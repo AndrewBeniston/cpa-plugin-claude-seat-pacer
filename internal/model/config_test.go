@@ -423,3 +423,19 @@ func TestNormalizeKeepsMaxStalenessPastTwoPolls(t *testing.T) {
 		t.Errorf("MaxStaleness = %v with warnings %q, want exactly two polls kept silently", kept.Quota.MaxStaleness, warnings)
 	}
 }
+
+func TestNormalizeFoldsOrder(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{OrderPlan, OrderPlan},
+		{OrderSoonestReset, OrderSoonestReset},
+		{"  Soonest-Reset ", OrderSoonestReset},
+		{"", OrderPlan},
+		{"fill-first", OrderPlan},
+	} {
+		cfg := Config{Pace: PaceConfig{Order: tc.in}}
+		cfg.Normalize()
+		if cfg.Pace.Order != tc.want {
+			t.Errorf("Order %q normalized to %q, want %q", tc.in, cfg.Pace.Order, tc.want)
+		}
+	}
+}
