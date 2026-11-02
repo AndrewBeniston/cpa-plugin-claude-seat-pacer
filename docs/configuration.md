@@ -76,7 +76,7 @@ the bindings, costing each open conversation one prompt-cache miss.
 weekly reset instead of their plan: the seat whose quota resets first takes
 every new conversation until it is full, then the next one does. The gates,
 the 5-hour-only seats first, and conversation affinity work as under `plan`.
-The shape, landing and weights then only choose which weekly windows count,
+The shape and landing then do nothing, and the weights only choose which weekly windows count,
 and the status page lists each seat's wait to that reset as its cost.
 
 Durations take Go syntax (`30s`, `2m`, `1h`). A weight above 100, a

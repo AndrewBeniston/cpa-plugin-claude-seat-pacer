@@ -116,11 +116,22 @@ func TestSoonestResetLeavesSessionOnlySeatsFirst(t *testing.T) {
 	}
 }
 
-func TestSoonestResetCountsAPastResetAsNow(t *testing.T) {
+// A reading taken before a reset still names it until the next read. The
+// seat has just started a new week, so it waits nearly all of it and goes
+// last rather than first.
+func TestSoonestResetRollsAPastResetForward(t *testing.T) {
 	now := testNow
-	pool := snapshots(seat("past", now, window(model.WindowWeekly, "", 0.5, now.Add(-time.Minute))))
-	if got := Rank(soonestCfg(), pool, []string{"past"}, opus, now)[0].Cost; got != 0 {
-		t.Errorf("cost = %v, want 0 for a reset already past", got)
+	pool := snapshots(
+		seat("just-reset", now, window(model.WindowWeekly, "", 0.9, now.Add(-time.Minute))),
+		seat("two-days", now, window(model.WindowWeekly, "", 0.3, now.Add(48*time.Hour))),
+	)
+	ranked := Rank(soonestCfg(), pool, []string{"just-reset", "two-days"}, opus, now)
+	if got := rankedIDs(ranked)[0]; got != "two-days" {
+		t.Fatalf("picked %q, want two-days: just-reset has a fresh week", got)
+	}
+	want := (model.WeeklyDuration - time.Minute).Hours() / 24
+	if got := scoreOf(t, ranked, "just-reset").Cost; math.Abs(got-want) > tolerance {
+		t.Errorf("just-reset cost = %v, want %v days", got, want)
 	}
 }
 

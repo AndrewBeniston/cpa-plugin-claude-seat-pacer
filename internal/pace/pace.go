@@ -120,13 +120,16 @@ func ScoreAuth(cfg model.PaceConfig, snap model.AuthSnapshot, modelID string, no
 	// its first weighted weekly reset. A weekly window with no period yet
 	// opens on first use, so it waits its whole length; a seat whose weekly
 	// windows all weigh nothing waits a week, which keeps every Cost in days.
+	// A reading taken before a reset still names that reset until the next
+	// read, so a reset already past rolls forward by whole periods: the seat
+	// has just started a new week and waits nearly all of it.
 	soonest := cfg.Order == model.OrderSoonestReset && !score.SessionOnly
 	untilReset := model.WeeklyDuration
 	for _, w := range snap.Windows {
 		if soonest && w.BearsOn(family) && w.Kind != model.WindowSession && weightOf(cfg, w, false) != 0 {
 			switch {
 			case open(w):
-				untilReset = min(untilReset, max(w.ResetsAt.Sub(now), 0))
+				untilReset = min(untilReset, untilNext(w, now))
 			case w.Duration > 0:
 				untilReset = min(untilReset, w.Duration)
 			}
@@ -181,6 +184,17 @@ func ScoreAuth(cfg model.PaceConfig, snap model.AuthSnapshot, modelID string, no
 		score.Reason = model.ReasonSpent
 	}
 	return score
+}
+
+// untilNext is the wait to an open window's next reset. A reset already past
+// rolls forward by whole periods, so a reset that has just happened waits a
+// full period.
+func untilNext(w model.Window, now time.Time) time.Duration {
+	left := w.ResetsAt.Sub(now)
+	if left > 0 {
+		return left
+	}
+	return w.Duration - (-left)%w.Duration
 }
 
 // open reports whether a window has a period to place on the curve.

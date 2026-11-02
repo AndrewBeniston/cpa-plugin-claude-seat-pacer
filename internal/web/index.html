@@ -2848,7 +2848,8 @@ time[data-ts] { cursor: help; }
     spec.big = [costText(std)];
     spec.delta = fams.length > 1 ? rankLabel(fams[0]) + " cost" : "cost";
     fams.forEach(function (fam, i) {
-      var sc = famScore(a, fam), parts = scored(sc) ? costParts(sc) : [];
+      /* A cost in days is no sum of window terms, so its card lists none. */
+      var sc = famScore(a, fam), parts = scored(sc) && !daysCost(sc) ? costParts(sc) : [];
       var t = [held[fam]].concat(i ? [costText(sc)] : [], parts).filter(Boolean).join(" · ");
       if (sc !== null && t) spec.lines.push({ b: fams.length > 1 ? rankLabel(fam) : "", t: t });
     });
@@ -5489,7 +5490,10 @@ time[data-ts] { cursor: help; }
             "a day, so it only gates, and the weekly window is the quota lost at reset."
           : " The " + SESSION_SHORT + " window weighs nothing: it resets several times a day, so its headroom is " +
             "not budget to pace.") +
-      " The eligible seat with the lowest cost takes the next new conversation" +
+      (ORDER === ORDER_SOONEST
+        ? " The plugin runs soonest reset first: a capped seat's cost is the wait to its first weighted weekly " +
+          "reset, and the eligible seat whose quota resets first takes the next new conversation"
+        : " The eligible seat with the lowest cost takes the next new conversation") +
       (fams.length ? " of its family, so each family has its own ranking: " + fams.join(" and ") +
         " for models with their own 7d window, Standard for the rest. The Standard windows apply to every " +
         "request on a seat that has them; " + onTopText(fams) : "") +
@@ -7684,7 +7688,8 @@ time[data-ts] { cursor: help; }
     }, 1);
     ul.style.setProperty("--rank-ch", String(1 + String(shown).length));
     var costOrder = byRank.some(function (x) { return sessionOnly(famScore(x, fam)); })
-      ? "seats with no weekly cap first, then lowest cost first" : "lowest cost first";
+      ? "seats with no weekly cap first, then " + (ORDER === ORDER_SOONEST ? "soonest reset first" : "lowest cost first")
+      : ORDER === ORDER_SOONEST ? "soonest reset first" : "lowest cost first";
     ul.setAttribute("aria-label", rankLabel(fam) + (ranks.tier.multi
       ? " ranking by priority tier; in the serving tier, " + costOrder : " ranking, " + costOrder));
     /* While the serving tier holds an eligible SessionOnly seat for the
